@@ -27,8 +27,8 @@ def build_unet(input_size=(256, 256, 3)):
 
 # Load ảnh & mask
 X, Y = [], []
-img_dir = "FinalProjectTest4/data/image"
-mask_dir = "FinalProjectTest4/data/mask"
+img_dir = "./data/image"
+mask_dir = "./data/mask"
 
 for filename in os.listdir(img_dir):
     if filename.lower().endswith(".jpg") and filename.startswith("image"):
@@ -59,5 +59,5 @@ model = build_unet()
 model.compile(optimizer=Adam(), loss='binary_crossentropy', metrics=['accuracy'])
 
 model.fit(X, Y, batch_size=8, epochs=20, validation_split=0.1,
-          callbacks=[ModelCheckpoint("FinalProjectTest4/models/unet_model.h5", save_best_only=True)])
+          callbacks=[ModelCheckpoint("./models/unet_model.h5", save_best_only=True)])
 

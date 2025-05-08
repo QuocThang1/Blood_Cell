@@ -303,9 +303,9 @@ class MedicalImageSegmentationApp(QMainWindow):
         group_members = [
             "Group 5",
             "22110007 Nguyễn Nhật An",
-            "22110007 Nguyễn Nhật An", 
-            "22110007 Nguyễn Nhật An",
-            "22110007 Nguyễn Nhật An"
+            "22110028 Nguyễn Mai Huy Hoàng", 
+            "22110070 Đinh Tô Quốc Thắng",
+            "22110076 Trần Trung Tín"
         ]
 
         for member in group_members:
