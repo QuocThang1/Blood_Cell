@@ -363,7 +363,7 @@ class MedicalImageSegmentationApp(QMainWindow):
         images_splitter.addWidget(mask_group)
         
         # Segmented image
-        segmented_group = QGroupBox("Segmented Image")
+        segmented_group = QGroupBox("Overlay Segmented Image")
         segmented_layout = QVBoxLayout()
         self.segmented_image_label = QLabel()
         self.segmented_image_label.setAlignment(Qt.AlignCenter)

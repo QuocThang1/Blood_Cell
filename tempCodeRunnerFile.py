@@ -16,11 +16,14 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 import pickle
 import os
+from tensorflow.keras.models import load_model
 import joblib # Add this import
-import torch
-from torchvision import transforms
 
-from unet import UNet  # Ensure the file is named unet.py
+try:
+    model = load_model("d:/Study/University/Semester2-Year3/Digital Image Processing/Final Project/main/Blood_Cell/models/unet_model.h5")
+    print("Model loaded successfully!")
+except Exception as e:
+    print(f"Error loading model: {e}")
 
 class MedicalImageSegmentationApp(QMainWindow):
     def __init__(self):
@@ -91,18 +94,6 @@ class MedicalImageSegmentationApp(QMainWindow):
         self.statusBar = QStatusBar()
         self.setStatusBar(self.statusBar)
         self.statusBar.showMessage("Ready")
-        
-        # Load PyTorch model
-        try:
-            self.segmentation_model = UNet(n_channels=3, n_classes=1)  # Specify the number of input channels and output classes
-            self.segmentation_model.load_state_dict(
-                torch.load("models/unet_best-8-5-16-26.pth", map_location=torch.device('cpu'))
-            )
-            self.segmentation_model.eval()  # Switch to evaluation mode
-            print("PyTorch model loaded successfully!")
-        except Exception as e:
-            print(f"Error loading PyTorch model: {e}")
-            self.segmentation_model = None
         
     def load_classifier(self):
         """
@@ -372,7 +363,7 @@ class MedicalImageSegmentationApp(QMainWindow):
         images_splitter.addWidget(mask_group)
         
         # Segmented image
-        segmented_group = QGroupBox("Overlay Segmented Image")
+        segmented_group = QGroupBox("Segmented Image")
         segmented_layout = QVBoxLayout()
         self.segmented_image_label = QLabel()
         self.segmented_image_label.setAlignment(Qt.AlignCenter)
@@ -470,15 +461,10 @@ class MedicalImageSegmentationApp(QMainWindow):
             self.process_progress.setValue(0)
     
     def segment_image(self):
-        """Perform image segmentation using the PyTorch model."""
+        """Perform image segmentation using the pre-trained U-Net model."""
         if self.original_image is None:
             self.results_label.setText("Please load an image first!")
             self.statusBar.showMessage("Error: No image loaded", 3000)
-            return
-
-        if self.segmentation_model is None:
-            self.results_label.setText("Segmentation model not loaded!")
-            self.statusBar.showMessage("Error: Model not loaded", 3000)
             return
 
         # Show progress and status
@@ -486,21 +472,24 @@ class MedicalImageSegmentationApp(QMainWindow):
         self.process_progress.setValue(10)
         QApplication.processEvents()
 
-        # Preprocess the image
-        preprocess = transforms.Compose([
-            transforms.ToPILImage(),
-            transforms.Resize((256, 256)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5], std=[0.5])  # Adjust based on model training
-        ])
-        input_tensor = preprocess(self.original_image).unsqueeze(0)  # Add batch dimension
-
-        # Perform inference
+        # Load the segmentation model
         try:
-            with torch.no_grad():
-                output = self.segmentation_model(input_tensor)
-                mask_pred = torch.sigmoid(output).squeeze().numpy()  # Convert to numpy array
-                mask_bin = (mask_pred > 0.5).astype(np.uint8)  # Binarize the mask
+            # Consider loading the model once during __init__ if it's always the same
+            seg_model = load_model("models/unet_model.h5")
+        except Exception as e:
+            self.results_label.setText("Failed to load segmentation model!")
+            self.statusBar.showMessage(f"Error: {e}", 3000)
+            return
+
+        # Preprocess the image
+        img_resized = cv2.resize(self.original_image, (256, 256))
+        input_tensor = img_resized / 255.0
+        input_tensor = np.expand_dims(input_tensor, axis=0)
+
+        # Predict the mask
+        try:
+            mask_pred = seg_model.predict(input_tensor)[0, :, :, 0]
+            mask_bin = (mask_pred > 0.5).astype(np.uint8)
         except Exception as e:
             self.results_label.setText("Segmentation failed!")
             self.statusBar.showMessage(f"Error: {e}", 3000)
@@ -511,15 +500,20 @@ class MedicalImageSegmentationApp(QMainWindow):
 
         # Create an overlay for the segmented region
         overlay = self.original_image.copy()
-        segment_color = np.array([255, 0, 0], dtype=np.uint8)  # Red color for segmentation
+        # Define color for segmentation (e.g., red)
+        segment_color = np.array([255, 0, 0], dtype=np.uint8) 
+        
+        # Apply color to the segmented region in the overlay
+        # Ensure segmented_mask is boolean or 0/1 for indexing
         overlay[self.segmented_mask == 1] = segment_color
-
+        
         # Blend the original image with the overlay
-        alpha = 0.4
+        alpha = 0.4  # Opacity factor (0.0 transparent, 1.0 opaque)
         self.segmented_image = cv2.addWeighted(overlay, alpha, self.original_image, 1 - alpha, 0)
 
         # Display results
-        self.display_image(self.segmented_mask * 255, self.mask_image_label)
+        # Ensure mask is displayed as a grayscale image
+        self.display_image(self.segmented_mask * 255, self.mask_image_label) 
         self.display_image(self.segmented_image, self.segmented_image_label)
 
         # Update status and results
