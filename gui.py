@@ -229,62 +229,6 @@ class MedicalImageSegmentationApp(QMainWindow):
         processing_group.setLayout(processing_layout)
         left_panel.addWidget(processing_group)
         
-        # Enhancement operations
-        enhancement_group = QGroupBox("Image Enhancement")
-        enhancement_layout = QVBoxLayout()
-        
-        # Contrast enhancement with styled slider
-        contrast_layout = QHBoxLayout()
-        contrast_icon = QLabel()
-        contrast_icon.setPixmap(self.create_icon_pixmap("contrast", QSize(20, 20)))
-        contrast_layout.addWidget(contrast_icon)
-        
-        contrast_label = QLabel("Contrast:")
-        contrast_label.setStyleSheet("font-weight: bold;")
-        contrast_layout.addWidget(contrast_label)
-        
-        self.contrast_slider = QSlider(Qt.Horizontal)
-        self.contrast_slider.setMinimum(0)
-        self.contrast_slider.setMaximum(100)
-        self.contrast_slider.setValue(50)
-        self.contrast_slider.valueChanged.connect(self.adjust_contrast)
-        contrast_layout.addWidget(self.contrast_slider)
-        
-        self.contrast_value = QLabel("1.0")
-        contrast_layout.addWidget(self.contrast_value)
-        enhancement_layout.addLayout(contrast_layout)
-        
-        # Sharpening with styled slider
-        sharpening_layout = QHBoxLayout()
-        sharpening_icon = QLabel()
-        sharpening_icon.setPixmap(self.create_icon_pixmap("sharpen", QSize(20, 20)))
-        sharpening_layout.addWidget(sharpening_icon)
-        
-        sharpening_label = QLabel("Sharpening:")
-        sharpening_label.setStyleSheet("font-weight: bold;")
-        sharpening_layout.addWidget(sharpening_label)
-        
-        self.sharpening_slider = QSlider(Qt.Horizontal)
-        self.sharpening_slider.setMinimum(0)
-        self.sharpening_slider.setMaximum(100)
-        self.sharpening_slider.setValue(0)
-        self.sharpening_slider.valueChanged.connect(self.apply_sharpening)
-        sharpening_layout.addWidget(self.sharpening_slider)
-        
-        self.sharpening_value = QLabel("0.0")
-        sharpening_layout.addWidget(self.sharpening_value)
-        enhancement_layout.addLayout(sharpening_layout)
-        
-        # Histogram button with icon
-        self.histogram_button = QPushButton("  Show Histogram")
-        self.histogram_button.setIcon(self.create_icon("chart-bar"))
-        self.histogram_button.setIconSize(QSize(20, 20))
-        self.histogram_button.clicked.connect(self.show_histogram)
-        enhancement_layout.addWidget(self.histogram_button)
-        
-        enhancement_group.setLayout(enhancement_layout)
-        left_panel.addWidget(enhancement_group)
-        
         # Results display with styled box
         results_group = QGroupBox("Classification Results")
         results_layout = QVBoxLayout()
@@ -464,11 +408,6 @@ class MedicalImageSegmentationApp(QMainWindow):
             self.statusBar.showMessage(f"Image loaded: {file_path.split('/')[-1]} ({self.original_image.shape[1]}x{self.original_image.shape[0]})", 5000)
             
             # Reset sliders to default
-            self.contrast_slider.setValue(50)
-            self.contrast_value.setText("1.0")
-            self.sharpening_slider.setValue(0)
-            self.sharpening_value.setText("0.0")
-            self.process_progress.setValue(0)
     
     def segment_image(self):
         """Perform image segmentation using the PyTorch model."""
@@ -577,6 +516,8 @@ class MedicalImageSegmentationApp(QMainWindow):
 
         try:
             pred_label = clf_model.predict([features])[0]
+            pred_probs = clf_model.predict_proba([features])[0]
+            accuracy = np.max(pred_probs) * 100 
         except Exception as e:
             self.results_label.setText("Classification failed!")
             self.statusBar.showMessage(f"Error: {e}", 3000)
@@ -587,6 +528,7 @@ class MedicalImageSegmentationApp(QMainWindow):
         <div style='text-align:center;'>
             <h3 style='color:#2980b9;'>Classification Result:</h3>
             <p style='font-size:16px; font-weight:bold; color:#16a085;'>{pred_label} White Blood Cell</p>
+            <p style='font-size:14px; color:#2c3e50;'>Accuracy: {accuracy:.2f}%</p>
         </div>
         """
         self.results_label.setText(result_html)
