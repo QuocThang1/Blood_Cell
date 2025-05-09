@@ -1,63 +1,81 @@
+# src/train.py
+import torch
+import torch.optim as optim
+from torch.utils.data import DataLoader, random_split
+from tqdm import tqdm
+from unet import UNet
+from dataset import BloodCellDataset
+from utils import get_transforms
+from config import image_dir, mask_dir, batch_size, num_epochs, learning_rate
 import os
-import cv2
-import numpy as np
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D, concatenate
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import ModelCheckpoint
-from utils.preprocessing import preprocess  # đảm bảo bạn có file này
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-# U-Net đơn giản
-def build_unet(input_size=(256, 256, 3)):
-    inputs = Input(input_size)
-    c1 = Conv2D(16, 3, activation='relu', padding='same')(inputs)
-    p1 = MaxPooling2D()(c1)
-    c2 = Conv2D(32, 3, activation='relu', padding='same')(p1)
-    p2 = MaxPooling2D()(c2)
-    b = Conv2D(64, 3, activation='relu', padding='same')(p2)
-    u1 = UpSampling2D()(b)
-    m1 = concatenate([u1, c2])
-    c3 = Conv2D(32, 3, activation='relu', padding='same')(m1)
-    u2 = UpSampling2D()(c3)
-    m2 = concatenate([u2, c1])
-    c4 = Conv2D(16, 3, activation='relu', padding='same')(m2)
-    output = Conv2D(1, 1, activation='sigmoid')(c4)
-    model = Model(inputs, output)
-    return model
+# Check for GPU
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"🖥 Using device: {device}")
 
-# Load ảnh & mask
-X, Y = [], []
-img_dir = "./data/image"
-mask_dir = "./data/mask"
+# DataLoader setup
+transform = get_transforms()
+dataset = BloodCellDataset(image_dir, mask_dir, transform=transform)
 
-for filename in os.listdir(img_dir):
-    if filename.lower().endswith(".jpg") and filename.startswith("image"):
-        image_path = os.path.join(img_dir, filename)
-        
-        # Ghép tên mask tương ứng: image1.jpg -> mask1.jpg
-        mask_filename = filename.replace("image", "mask")
-        mask_path = os.path.join(mask_dir, mask_filename)
+train_size = int(0.8 * len(dataset))
+val_size = len(dataset) - train_size
+train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
-        img = cv2.imread(image_path)
-        mask = cv2.imread(mask_path, 0)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=batch_size)
 
-        if img is not None and mask is not None:
-            img = preprocess(img)  # resize, normalize, etc. (nếu bạn có)
-            mask = cv2.resize(mask, (256, 256)) / 255.0
-            X.append(img)
-            Y.append(mask)
-        else:
-            print(f"⚠️ Bỏ qua: {filename} (ảnh hoặc mask không tồn tại)")
+# Model, Loss, Optimizer
+model = UNet(n_channels=3, n_classes=1).to(device)
+criterion = torch.nn.BCEWithLogitsLoss()
+optimizer = optim.AdamW(model.parameters(), lr=learning_rate)
 
-X = np.array(X)
-Y = np.expand_dims(np.array(Y), axis=-1)
+# Scheduler for learning rate
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
 
-print(f"Tổng ảnh huấn luyện: {X.shape[0]}")
+# Training loop
+best_val_loss = float("inf")
 
-# Train model
-model = build_unet()
-model.compile(optimizer=Adam(), loss='binary_crossentropy', metrics=['accuracy'])
+for epoch in range(num_epochs):
+    model.train()
+    train_loss = 0.0
+    loop = tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Training]")
 
-model.fit(X, Y, batch_size=8, epochs=20, validation_split=0.1,
-          callbacks=[ModelCheckpoint("./models/unet_model.h5", save_best_only=True)])
+    for images, masks in loop:
+        images = images.to(device)
+        masks = masks.to(device).float()
 
+        optimizer.zero_grad()
+        outputs = model(images)
+        loss = criterion(outputs, masks)
+        loss.backward()
+        optimizer.step()
+
+        train_loss += loss.item()
+        loop.set_postfix(loss=loss.item())
+
+    train_loss /= len(train_loader)
+
+    # Validation
+    model.eval()
+    val_loss = 0.0
+    with torch.no_grad():
+        for images, masks in tqdm(val_loader, desc=f"Epoch {epoch+1}/{num_epochs} [Validation]"):
+            images = images.to(device)
+            masks = masks.to(device).float()
+
+            outputs = model(images)
+            loss = criterion(outputs, masks)
+            val_loss += loss.item()
+
+    val_loss /= len(val_loader)
+    scheduler.step(val_loss)
+
+    print(f"🔵 Train Loss: {train_loss:.4f} | 🟢 Val Loss: {val_loss:.4f}")
+
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        torch.save(model.state_dict(), './models/unet_best.pth')
+        print("✅ Model saved with lower validation loss!")
+
+print("🎉 Finished Training")
