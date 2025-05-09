@@ -9,7 +9,7 @@ from sklearn.metrics import classification_report, accuracy_score
 from utils.features import extract_features  # Đảm bảo bạn đã có file này
 
 # Đọc file class labels
-df = pd.read_csv("FinalProjectTest4/data/class labels.csv")
+df = pd.read_csv("./data/KRD-WBC dataset/class labels.csv")
 
 X_feat = []
 y = []
@@ -23,8 +23,8 @@ for idx, row in df.iterrows():
     image_id = raw_id.lower()
     mask_id = "mask" + raw_id[5:]
 
-    image_path = os.path.join("FinalProjectTest4/data/image", image_id + ".jpg")
-    mask_path = os.path.join("FinalProjectTest4/data/mask", mask_id + ".jpg")
+    image_path = os.path.join("./data/KRD-WBC dataset/Dataset/image", image_id + ".jpg")
+    mask_path = os.path.join("./data/KRD-WBC dataset/Dataset/mask", mask_id + ".jpg")
 
     if not os.path.exists(image_path) or not os.path.exists(mask_path):
         print(f"⚠️ Thiếu file: {image_path} hoặc {mask_path}")
@@ -69,6 +69,6 @@ print("\n📊 Classification Report:")
 print(classification_report(y_test, y_pred))
 
 # Lưu model
-save_path = "FinalProjectTest4/models/classifier.pkl"
+save_path = "./models/classifier.pkl"
 joblib.dump(model, save_path)
 print(f"💾 Mô hình đã được lưu tại: {save_path}")

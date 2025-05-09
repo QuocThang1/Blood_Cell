@@ -6,11 +6,11 @@ from utils.preprocessing import preprocess
 from utils.features import extract_features
 
 # Load mô hình segmentation và classifier
-seg_model = load_model("FinalProjectTest4/models/unet_model.h5")
-clf_model = joblib.load("FinalProjectTest4/models/classifier.pkl")
+seg_model = load_model("./models/unet_model.h5")
+clf_model = joblib.load("./models/classifier.pkl")
 
 # Đọc ảnh đầu vào
-img_path = "FinalProjectTest4/data/imageinput/Neutrophil2.jpg"
+img_path = "./data/imageinput/Neutrophil2.jpg"
 img = cv2.imread(img_path)
 
 if img is None:
