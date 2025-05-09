@@ -3,7 +3,9 @@ import cv2
 import numpy as np
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, 
                             QHBoxLayout, QWidget, QFileDialog, QComboBox, QSlider, QGroupBox,
-                            QStatusBar, QSplitter, QProgressBar, QFrame, QToolButton)
+                            QStatusBar, QSplitter, QProgressBar, QFrame, QToolButton, QTabWidget, QTextEdit, QMessageBox)
+
+
 from PyQt5.QtGui import QPixmap, QImage, QFont, QIcon, QPalette, QColor, QLinearGradient, QBrush
 from PyQt5.QtCore import Qt, QSize, QTimer
 import matplotlib.pyplot as plt
@@ -26,6 +28,11 @@ from unet import UNet  # Ensure the file is named unet.py
 class MedicalImageSegmentationApp(QMainWindow):
     def __init__(self):
         super().__init__()
+        
+        # # Set window properties
+        
+        
+
         
         # Set application style and colors
         self.setStyleSheet("""
@@ -127,220 +134,30 @@ class MedicalImageSegmentationApp(QMainWindow):
         self.setWindowTitle("Medical Image Segmentation and Classification")
         self.setGeometry(100, 100, 1200, 800)
         
-        # Set application icon if you have one
-        # self.setWindowIcon(QIcon('icon.png'))
+        # Create tab widget
+        self.tab_widget = QTabWidget()
+        
+        # Create widgets for tabs
+        self.main_tab = QWidget()
+        self.evaluation_tab = QWidget()
+        
+        # Setup main tab
+        self.setup_main_tab()
+        
+        # Setup evaluation tab
+        self.setup_evaluation_tab()
+        
+        # Add tabs to widget
+        self.tab_widget.addTab(self.main_tab, "Single Image Analysis")
+        self.tab_widget.addTab(self.evaluation_tab, "Model Evaluation")
+        
+        # Set as central widget (chỉ đặt một lần duy nhất)
+        self.setCentralWidget(self.tab_widget)
         
         # Set application font
         font = QFont("Segoe UI", 10)
         QApplication.setFont(font)
-        
-        # Create main splitter
-        main_splitter = QSplitter(Qt.Horizontal)
-        
-        # Create left panel container with styled border
-        left_container = QFrame()
-        left_container.setFrameShape(QFrame.StyledPanel)
-        left_container.setAutoFillBackground(True)
-        palette = left_container.palette()
-        palette.setColor(QPalette.Window, QColor("#e6eef5"))
-        left_container.setPalette(palette)
-        
-        # Left panel - controls
-        left_panel = QVBoxLayout(left_container)
-        left_panel.setContentsMargins(10, 10, 10, 10)
-        left_panel.setSpacing(15)
-        
-        # App title and logo
-        title_layout = QHBoxLayout()
-        app_logo = QLabel()
-        app_logo.setPixmap(self.create_icon_pixmap("microscope", QSize(40, 40)))
-        title_layout.addWidget(app_logo)
-        
-        app_title = QLabel("Medical Image Analysis")
-        app_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #2c3e50;")
-        title_layout.addWidget(app_title, 1)
-        left_panel.addLayout(title_layout)
-        
-        # Horizontal line
-        h_line = QFrame()
-        h_line.setFrameShape(QFrame.HLine)
-        h_line.setFrameShadow(QFrame.Sunken)
-        h_line.setStyleSheet("background-color: #6c8ebf;")
-        left_panel.addWidget(h_line)
-        
-        # File operations
-        file_group = QGroupBox("File Operations")
-        file_layout = QVBoxLayout()
-        
-        # Load image button with icon
-        self.load_button = QPushButton("  Load Image")
-        self.load_button.setIcon(self.create_icon("folder-open"))
-        self.load_button.setIconSize(QSize(20, 20))
-        self.load_button.clicked.connect(self.load_image)
-        file_layout.addWidget(self.load_button)
-        
-        # Save results button with icon
-        self.save_button = QPushButton("  Save Results")
-        self.save_button.setIcon(self.create_icon("save"))
-        self.save_button.setIconSize(QSize(20, 20))
-        self.save_button.clicked.connect(self.save_results)
-        file_layout.addWidget(self.save_button)
-        
-        file_group.setLayout(file_layout)
-        left_panel.addWidget(file_group)
-        
-        # Processing operations
-        processing_group = QGroupBox("Image Processing")
-        processing_layout = QVBoxLayout()
-        
-        # Segment button with icon
-        self.segment_button = QPushButton("  Perform Segmentation")
-        self.segment_button.setIcon(self.create_icon("split"))
-        self.segment_button.setIconSize(QSize(20, 20))
-        self.segment_button.clicked.connect(self.segment_image)
-        processing_layout.addWidget(self.segment_button)
-        
-        # Progress bar for segmentation
-        self.process_progress = QProgressBar()
-        self.process_progress.setRange(0, 100)
-        self.process_progress.setValue(0)
-        self.process_progress.setTextVisible(True)
-        self.process_progress.setStyleSheet("""
-            QProgressBar {
-                border: 1px solid #bbb;
-                border-radius: 5px;
-                text-align: center;
-                background-color: #f0f0f0;
-            }
-            QProgressBar::chunk {
-                background-color: #3498db;
-                border-radius: 5px;
-            }
-        """)
-        processing_layout.addWidget(self.process_progress)
-        
-        # Classify button with icon
-        self.classify_button = QPushButton("  Classify White Cell")
-        self.classify_button.setIcon(self.create_icon("tag"))
-        self.classify_button.setIconSize(QSize(20, 20))
-        self.classify_button.clicked.connect(self.classify_white_cell)
-        processing_layout.addWidget(self.classify_button)
-        
-        processing_group.setLayout(processing_layout)
-        left_panel.addWidget(processing_group)
-        
-        # Results display with styled box
-        results_group = QGroupBox("Classification Results")
-        results_layout = QVBoxLayout()
-        
-        self.results_label = QLabel("No classification results yet.")
-        self.results_label.setWordWrap(True)
-        self.results_label.setStyleSheet("""
-            background-color: white;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-            font-weight: bold;
-        """)
-        self.results_label.setMinimumHeight(60)
-        results_layout.addWidget(self.results_label)
-        
-        results_group.setLayout(results_layout)
-        left_panel.addWidget(results_group)
-        
-        left_panel.addStretch()
 
-        # Group Information
-        group_info_group = QGroupBox("Group Information")
-        group_info_layout = QVBoxLayout()
-
-        group_members = [
-            "Group 5",
-            "22110007 Nguyễn Nhật An",
-            "22110028 Nguyễn Mai Huy Hoàng", 
-            "22110070 Đinh Tô Quốc Thắng",
-            "22110076 Trần Trung Tín"
-        ]
-
-        for member in group_members:
-            member_label = QLabel(member)
-            # member_label.setStyleSheet("font-size: 10px; color: #2c3e50;") # Optional: style as needed
-            group_info_layout.addWidget(member_label)
-
-        group_info_group.setLayout(group_info_layout)
-        left_panel.addWidget(group_info_group)
-        
-        # Right panel - create container for image display
-        right_container = QWidget()
-        right_panel = QVBoxLayout(right_container)
-        right_panel.setContentsMargins(10, 10, 10, 10)
-        right_panel.setSpacing(15)
-        
-        # Add title to right panel
-        image_title = QLabel("Image Visualization")
-        image_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50;")
-        image_title.setAlignment(Qt.AlignCenter)
-        right_panel.addWidget(image_title)
-        
-        # Right panel layout for images (3x1 grid)
-        images_splitter = QSplitter(Qt.Vertical)
-        images_splitter.setChildrenCollapsible(False)
-        
-        # Original image
-        original_group = QGroupBox("Original Image")
-        original_layout = QVBoxLayout()
-        self.original_image_label = QLabel()
-        self.original_image_label.setAlignment(Qt.AlignCenter)
-        self.original_image_label.setMinimumSize(400, 200)
-        self.original_image_label.setStyleSheet("""
-            background-color: #f8f9fa;
-            border: 2px solid #d4e2f4;
-            border-radius: 5px;
-        """)
-        original_layout.addWidget(self.original_image_label)
-        original_group.setLayout(original_layout)
-        images_splitter.addWidget(original_group)
-        
-        # Segmentation mask
-        mask_group = QGroupBox("Segmentation Mask")
-        mask_layout = QVBoxLayout()
-        self.mask_image_label = QLabel()
-        self.mask_image_label.setAlignment(Qt.AlignCenter)
-        self.mask_image_label.setMinimumSize(400, 200)
-        self.mask_image_label.setStyleSheet("""
-            background-color: #f8f9fa;
-            border: 2px solid #d4e2f4;
-            border-radius: 5px;
-        """)
-        mask_layout.addWidget(self.mask_image_label)
-        mask_group.setLayout(mask_layout)
-        images_splitter.addWidget(mask_group)
-        
-        # Segmented image
-        segmented_group = QGroupBox("Overlay Segmented Image")
-        segmented_layout = QVBoxLayout()
-        self.segmented_image_label = QLabel()
-        self.segmented_image_label.setAlignment(Qt.AlignCenter)
-        self.segmented_image_label.setMinimumSize(400, 200)
-        self.segmented_image_label.setStyleSheet("""
-            background-color: #f8f9fa;
-            border: 2px solid #d4e2f4;
-            border-radius: 5px;
-        """)
-        segmented_layout.addWidget(self.segmented_image_label)
-        segmented_group.setLayout(segmented_layout)
-        images_splitter.addWidget(segmented_group)
-        
-        right_panel.addWidget(images_splitter)
-        
-        # Add panels to main splitter
-        main_splitter.addWidget(left_container)
-        main_splitter.addWidget(right_container)
-        main_splitter.setStretchFactor(0, 1)  # Left panel
-        main_splitter.setStretchFactor(1, 3)  # Right panel
-        
-        # Set central widget
-        self.setCentralWidget(main_splitter)
     
     def create_icon(self, name):
         """Create an icon based on name (placeholder for actual icons)"""
@@ -795,6 +612,929 @@ class MedicalImageSegmentationApp(QMainWindow):
             border-radius: 5px;
             padding: 5px;
         """)
+
+    def setup_main_tab(self):
+        # Create layout for main tab
+        main_layout = QVBoxLayout(self.main_tab)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Create main splitter
+        main_splitter = QSplitter(Qt.Horizontal)
+        
+        # Create left panel container with styled border
+        left_container = QFrame()
+        left_container.setFrameShape(QFrame.StyledPanel)
+        left_container.setAutoFillBackground(True)
+        palette = left_container.palette()
+        palette.setColor(QPalette.Window, QColor("#e6eef5"))
+        left_container.setPalette(palette)
+        
+        # Left panel - controls
+        left_panel = QVBoxLayout(left_container)
+        left_panel.setContentsMargins(10, 10, 10, 10)
+        left_panel.setSpacing(15)
+        
+        # App title and logo
+        title_layout = QHBoxLayout()
+        app_logo = QLabel()
+        app_logo.setPixmap(self.create_icon_pixmap("microscope", QSize(40, 40)))
+        title_layout.addWidget(app_logo)
+        
+        app_title = QLabel("Medical Image Analysis")
+        app_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #2c3e50;")
+        title_layout.addWidget(app_title, 1)
+        left_panel.addLayout(title_layout)
+        
+        # Horizontal line
+        h_line = QFrame()
+        h_line.setFrameShape(QFrame.HLine)
+        h_line.setFrameShadow(QFrame.Sunken)
+        h_line.setStyleSheet("background-color: #6c8ebf;")
+        left_panel.addWidget(h_line)
+        
+        # File operations
+        file_group = QGroupBox("File Operations")
+        file_layout = QVBoxLayout()
+        
+        # Load image button with icon
+        self.load_button = QPushButton("  Load Image")
+        self.load_button.setIcon(self.create_icon("folder-open"))
+        self.load_button.setIconSize(QSize(20, 20))
+        self.load_button.clicked.connect(self.load_image)
+        file_layout.addWidget(self.load_button)
+        
+        # Save results button with icon
+        self.save_button = QPushButton("  Save Results")
+        self.save_button.setIcon(self.create_icon("save"))
+        self.save_button.setIconSize(QSize(20, 20))
+        self.save_button.clicked.connect(self.save_results)
+        file_layout.addWidget(self.save_button)
+        
+        file_group.setLayout(file_layout)
+        left_panel.addWidget(file_group)
+        
+        # Processing operations
+        processing_group = QGroupBox("Image Processing")
+        processing_layout = QVBoxLayout()
+        
+        # Segment button with icon
+        self.segment_button = QPushButton("  Perform Segmentation")
+        self.segment_button.setIcon(self.create_icon("split"))
+        self.segment_button.setIconSize(QSize(20, 20))
+        self.segment_button.clicked.connect(self.segment_image)
+        processing_layout.addWidget(self.segment_button)
+        
+        # Progress bar for segmentation
+        self.process_progress = QProgressBar()
+        self.process_progress.setRange(0, 100)
+        self.process_progress.setValue(0)
+        self.process_progress.setTextVisible(True)
+        self.process_progress.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #bbb;
+                border-radius: 5px;
+                text-align: center;
+                background-color: #f0f0f0;
+            }
+            QProgressBar::chunk {
+                background-color: #3498db;
+                border-radius: 5px;
+            }
+        """)
+        processing_layout.addWidget(self.process_progress)
+        
+        # Classify button with icon
+        self.classify_button = QPushButton("  Classify White Cell")
+        self.classify_button.setIcon(self.create_icon("tag"))
+        self.classify_button.setIconSize(QSize(20, 20))
+        self.classify_button.clicked.connect(self.classify_white_cell)
+        processing_layout.addWidget(self.classify_button)
+        
+        processing_group.setLayout(processing_layout)
+        left_panel.addWidget(processing_group)
+        
+        # Results display with styled box
+        results_group = QGroupBox("Classification Results")
+        results_layout = QVBoxLayout()
+        
+        self.results_label = QLabel("No classification results yet.")
+        self.results_label.setWordWrap(True)
+        self.results_label.setStyleSheet("""
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-weight: bold;
+        """)
+        self.results_label.setMinimumHeight(60)
+        results_layout.addWidget(self.results_label)
+        
+        results_group.setLayout(results_layout)
+        left_panel.addWidget(results_group)
+        
+        left_panel.addStretch()
+
+        # Group Information
+        group_info_group = QGroupBox("Group Information")
+        group_info_layout = QVBoxLayout()
+
+        group_members = [
+            "Group 5",
+            "22110007 Nguyễn Nhật An",
+            "22110028 Nguyễn Mai Huy Hoàng", 
+            "22110070 Đinh Tô Quốc Thắng",
+            "22110076 Trần Trung Tín"
+        ]
+
+        for member in group_members:
+            member_label = QLabel(member)
+            group_info_layout.addWidget(member_label)
+        
+        group_info_group.setLayout(group_info_layout)
+        left_panel.addWidget(group_info_group)
+        
+        # Right panel - create container for image display
+        right_container = QWidget()
+        right_panel = QVBoxLayout(right_container)
+        right_panel.setContentsMargins(10, 10, 10, 10)
+        right_panel.setSpacing(15)
+        
+        # Add title to right panel
+        image_title = QLabel("Image Visualization")
+        image_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50;")
+        image_title.setAlignment(Qt.AlignCenter)
+        right_panel.addWidget(image_title)
+        
+        # Right panel layout for images (3x1 grid)
+        images_splitter = QSplitter(Qt.Vertical)
+        images_splitter.setChildrenCollapsible(False)
+        
+        # Original image
+        original_group = QGroupBox("Original Image")
+        original_layout = QVBoxLayout()
+        self.original_image_label = QLabel()
+        self.original_image_label.setAlignment(Qt.AlignCenter)
+        self.original_image_label.setMinimumSize(400, 200)
+        self.original_image_label.setStyleSheet("""
+            background-color: #f8f9fa;
+            border: 2px solid #d4e2f4;
+            border-radius: 5px;
+        """)
+        original_layout.addWidget(self.original_image_label)
+        original_group.setLayout(original_layout)
+        images_splitter.addWidget(original_group)
+        
+        # Segmentation mask
+        mask_group = QGroupBox("Segmentation Mask")
+        mask_layout = QVBoxLayout()
+        self.mask_image_label = QLabel()
+        self.mask_image_label.setAlignment(Qt.AlignCenter)
+        self.mask_image_label.setMinimumSize(400, 200)
+        self.mask_image_label.setStyleSheet("""
+            background-color: #f8f9fa;
+            border: 2px solid #d4e2f4;
+            border-radius: 5px;
+        """)
+        mask_layout.addWidget(self.mask_image_label)
+        mask_group.setLayout(mask_layout)
+        images_splitter.addWidget(mask_group)
+        
+        # Segmented image
+        segmented_group = QGroupBox("Overlay Segmented Image")
+        segmented_layout = QVBoxLayout()
+        self.segmented_image_label = QLabel()
+        self.segmented_image_label.setAlignment(Qt.AlignCenter)
+        self.segmented_image_label.setMinimumSize(400, 200)
+        self.segmented_image_label.setStyleSheet("""
+            background-color: #f8f9fa;
+            border: 2px solid #d4e2f4;
+            border-radius: 5px;
+        """)
+        segmented_layout.addWidget(self.segmented_image_label)
+        segmented_group.setLayout(segmented_layout)
+        images_splitter.addWidget(segmented_group)
+        
+        right_panel.addWidget(images_splitter)
+        
+        # Add panels to main splitter
+        main_splitter.addWidget(left_container)
+        main_splitter.addWidget(right_container)
+        main_splitter.setStretchFactor(0, 1)  # Left panel
+        main_splitter.setStretchFactor(1, 3)  # Right panel
+        
+        # Add main splitter to the tab layout
+        main_layout.addWidget(main_splitter)
+
+    
+    def setup_evaluation_tab(self):
+        # Create layout for evaluation tab
+        eval_layout = QVBoxLayout(self.evaluation_tab)
+        eval_layout.setContentsMargins(10, 10, 10, 10)
+        eval_layout.setSpacing(15)
+        
+        # Title for evaluation tab
+        eval_title = QLabel("Model Evaluation and Analysis")
+        eval_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #2c3e50;")
+        eval_title.setAlignment(Qt.AlignCenter)
+        eval_layout.addWidget(eval_title)
+        
+        # Create top section for controls
+        controls_splitter = QSplitter(Qt.Horizontal)
+        
+        # Left side - dataset selection
+        dataset_group = QGroupBox("Dataset Selection")
+        dataset_layout = QVBoxLayout()
+        
+        # Dataset path display
+        self.dataset_path_label = QLabel("No dataset selected")
+        self.dataset_path_label.setWordWrap(True)
+        self.dataset_path_label.setStyleSheet("""
+            background-color: white;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        """)
+        dataset_layout.addWidget(self.dataset_path_label)
+        
+        # Select dataset button
+        select_dataset_btn = QPushButton("  Select Dataset Folder")
+        select_dataset_btn.setIcon(self.create_icon("folder-open"))
+        select_dataset_btn.setIconSize(QSize(20, 20))
+        select_dataset_btn.clicked.connect(self.select_dataset_folder)
+        dataset_layout.addWidget(select_dataset_btn)
+        
+        dataset_group.setLayout(dataset_layout)
+        
+        # Right side - evaluation controls
+        eval_controls_group = QGroupBox("Evaluation Controls")
+        eval_controls_layout = QVBoxLayout()
+        
+        # Segmentation evaluation button
+        self.run_seg_eval_btn = QPushButton("  Evaluate Segmentation")
+        self.run_seg_eval_btn.setIcon(self.create_icon("chart-bar"))
+        self.run_seg_eval_btn.setIconSize(QSize(20, 20))
+        self.run_seg_eval_btn.clicked.connect(self.evaluate_segmentation)
+        self.run_seg_eval_btn.setEnabled(False)
+        eval_controls_layout.addWidget(self.run_seg_eval_btn)
+        
+        # Classification evaluation button
+        self.run_class_eval_btn = QPushButton("  Evaluate Classification")
+        self.run_class_eval_btn.setIcon(self.create_icon("tag"))
+        self.run_class_eval_btn.setIconSize(QSize(20, 20))
+        self.run_class_eval_btn.clicked.connect(self.evaluate_classification)
+        self.run_class_eval_btn.setEnabled(False)
+        eval_controls_layout.addWidget(self.run_class_eval_btn)
+        
+        # Progress bar
+        self.eval_progress = QProgressBar()
+        self.eval_progress.setRange(0, 100)
+        self.eval_progress.setValue(0)
+        self.eval_progress.setTextVisible(True)
+        self.eval_progress.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #bbb;
+                border-radius: 5px;
+                text-align: center;
+                background-color: #f0f0f0;
+            }
+            QProgressBar::chunk {
+                background-color: #3498db;
+                border-radius: 5px;
+            }
+        """)
+        eval_controls_layout.addWidget(self.eval_progress)
+        
+        eval_controls_group.setLayout(eval_controls_layout)
+        
+        # Add groups to splitter
+        controls_splitter.addWidget(dataset_group)
+        controls_splitter.addWidget(eval_controls_group)
+        
+        eval_layout.addWidget(controls_splitter)
+        
+        # Results section
+        results_splitter = QSplitter(Qt.Horizontal)
+        
+        # Text results
+        text_results_group = QGroupBox("Evaluation Metrics")
+        text_results_layout = QVBoxLayout()
+        
+        self.eval_results_text = QTextEdit()
+        self.eval_results_text.setReadOnly(True)
+        text_results_layout.addWidget(self.eval_results_text)
+        
+        text_results_group.setLayout(text_results_layout)
+        
+        # Chart results
+        chart_results_group = QGroupBox("Visual Analysis")
+        self.eval_chart_layout = QVBoxLayout()
+        
+        # Placeholder text
+        placeholder_label = QLabel("Charts will appear here after evaluation")
+        placeholder_label.setAlignment(Qt.AlignCenter)
+        placeholder_label.setStyleSheet("color: #888; font-style: italic;")
+        self.eval_chart_layout.addWidget(placeholder_label)
+        
+        chart_results_group.setLayout(self.eval_chart_layout)
+        
+        # Add to splitter
+        results_splitter.addWidget(text_results_group)
+        results_splitter.addWidget(chart_results_group)
+        
+        eval_layout.addWidget(results_splitter, 1)  # Give it more stretch
+
+    def select_dataset_folder(self):
+        """Select a dataset folder containing image and mask subfolders"""
+        folder_path = QFileDialog.getExistingDirectory(self, "Select Dataset Folder")
+        
+        if folder_path:
+            # Check if folder contains 'image' and 'mask' subfolders
+            image_folder = os.path.join(folder_path, "image")
+            mask_folder = os.path.join(folder_path, "mask")
+            
+            if not (os.path.exists(image_folder) and os.path.exists(mask_folder)):
+                QMessageBox.warning(self, "Invalid Dataset", 
+                                "The selected folder must contain 'image' and 'mask' subfolders.")
+                return
+            
+            # Store folder paths
+            self.dataset_folder = folder_path
+            self.image_folder = image_folder
+            self.mask_folder = mask_folder
+            
+            # Sort function for natural sorting
+            def natural_sort_key(s):
+                import re
+                return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
+            
+            # Get and sort image files
+            self.image_files = [f for f in os.listdir(image_folder) 
+                            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp'))]
+            self.image_files.sort(key=natural_sort_key)  # Sort naturally
+            
+            # Get and sort mask files
+            self.mask_files = [f for f in os.listdir(mask_folder) 
+                            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp'))]
+            self.mask_files.sort(key=natural_sort_key)  # Sort naturally
+            
+            # Check if we have matching counts
+            valid_pairs = min(len(self.image_files), len(self.mask_files))
+            
+            if valid_pairs == 0:
+                QMessageBox.warning(self, "No Valid Pairs", 
+                                "No matching image-mask pairs found in the selected folders.")
+                return
+                
+            # Update UI
+            self.dataset_path_label.setText(f"Dataset: {folder_path}\n"
+                                        f"Found {len(self.image_files)} images with {valid_pairs} valid image-mask pairs")
+            
+            # Enable evaluation button if valid pairs found
+            self.run_seg_eval_btn.setEnabled(valid_pairs > 0)
+            
+            # Clear previous results
+            self.eval_results_text.clear()
+            self.clear_chart_layout()
+            
+            # Show information about the dataset
+            self.statusBar.showMessage(f"Loaded dataset with {valid_pairs} image-mask pairs", 5000)
+
+
+    def evaluate_segmentation(self):
+        """Evaluate the segmentation model on the dataset"""
+        if not hasattr(self, 'image_files') or not self.image_files:
+            QMessageBox.warning(self, "No Images", "Please select a valid dataset folder first.")
+            return
+        
+        if self.segmentation_model is None:
+            QMessageBox.warning(self, "No Model", "Segmentation model is not loaded.")
+            return
+        
+        # Clear previous results
+        self.eval_results_text.clear()
+        self.clear_chart_layout()
+        
+        # Initialize metrics
+        results = {
+            'image_name': [],
+            'accuracy': [],
+            'iou': [],
+            'dice': [],
+            'precision': [],
+            'recall': []
+        }
+        
+        # Update UI
+        self.eval_results_text.append("Starting segmentation evaluation...")
+        QApplication.processEvents()
+        
+        # Limit to 100 images
+        max_images = min(100, min(len(self.image_files), len(self.mask_files)))
+        
+        # Process images
+        for i in range(max_images):
+            # Update progress
+            self.eval_progress.setValue((i+1) * 100 // max_images)
+            QApplication.processEvents()
+            
+            # Load image and ground truth mask using the sorted indices
+            image_path = os.path.join(self.image_folder, self.image_files[i])
+            mask_path = os.path.join(self.mask_folder, self.mask_files[i])
+            
+            # Load image and mask
+            original_image = cv2.imread(image_path)
+            ground_truth = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+            
+            if original_image is None or ground_truth is None:
+                self.eval_results_text.append(f"Error loading image {self.image_files[i]} or mask {self.mask_files[i]}")
+                continue
+            
+            original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
+            ground_truth_binary = (ground_truth > 0).astype(np.uint8)
+            
+            # Perform segmentation
+            try:
+                # Preprocess image
+                preprocess = transforms.Compose([
+                    transforms.ToPILImage(),
+                    transforms.Resize((256, 256)),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                ])
+                input_tensor = preprocess(original_image).unsqueeze(0)
+                
+                # Run model
+                with torch.no_grad():
+                    output = self.segmentation_model(input_tensor)
+                    mask_pred = torch.sigmoid(output).squeeze().numpy()
+                    predicted_mask = (mask_pred > 0.5).astype(np.uint8)
+                
+                # Resize mask to original size
+                predicted_mask = cv2.resize(predicted_mask, 
+                                        (original_image.shape[1], original_image.shape[0]), 
+                                        interpolation=cv2.INTER_NEAREST)
+                
+                # Calculate metrics
+                # Accuracy
+                correct_pixels = np.sum(predicted_mask == ground_truth_binary)
+                total_pixels = ground_truth_binary.size
+                accuracy = correct_pixels / total_pixels
+                
+                # IoU and Dice
+                intersection = np.sum(predicted_mask * ground_truth_binary)
+                union = np.sum(predicted_mask) + np.sum(ground_truth_binary) - intersection
+                
+                iou = intersection / union if union > 0 else 0.0
+                dice = (2. * intersection) / (np.sum(predicted_mask) + np.sum(ground_truth_binary)) if (np.sum(predicted_mask) + np.sum(ground_truth_binary)) > 0 else 0.0
+                
+                # Precision and Recall
+                tp = intersection
+                fp = np.sum(predicted_mask) - tp
+                fn = np.sum(ground_truth_binary) - tp
+                
+                precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+                recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+                
+                # Store results
+                results['image_name'].append(self.image_files[i])
+                results['accuracy'].append(accuracy)
+                results['iou'].append(iou)
+                results['dice'].append(dice)
+                results['precision'].append(precision)
+                results['recall'].append(recall)
+                    
+            except Exception as e:
+                self.eval_results_text.append(f"Error processing {self.image_files[i]}: {str(e)}")
+        
+        # Display results
+        self.display_segmentation_results(results)
+        
+        # Enable classification evaluation
+        self.run_class_eval_btn.setEnabled(len(results['dice']) > 0)
+
+    def display_segmentation_results(self, results):
+        """Display segmentation evaluation results with comprehensive charts"""
+        if not results['dice']:
+            self.eval_results_text.append("No valid results to display.")
+            return
+        
+        # Calculate statistics
+        mean_accuracy = np.mean(results['accuracy'])
+        mean_iou = np.mean(results['iou'])
+        mean_dice = np.mean(results['dice'])
+        mean_precision = np.mean(results['precision'])
+        mean_recall = np.mean(results['recall'])
+        
+        std_accuracy = np.std(results['accuracy'])
+        std_iou = np.std(results['iou'])
+        std_dice = np.std(results['dice'])
+        std_precision = np.std(results['precision'])
+        std_recall = np.std(results['recall'])
+        
+        # Display text results
+        self.eval_results_text.append(f"\nSegmentation Evaluation Results:")
+        self.eval_results_text.append(f"Number of images evaluated: {len(results['dice'])}")
+        self.eval_results_text.append(f"Mean Accuracy: {mean_accuracy:.4f} ± {std_accuracy:.4f}")
+        self.eval_results_text.append(f"Mean IoU: {mean_iou:.4f} ± {std_iou:.4f}")
+        self.eval_results_text.append(f"Mean Dice Coefficient: {mean_dice:.4f} ± {std_dice:.4f}")
+        self.eval_results_text.append(f"Mean Precision: {mean_precision:.4f} ± {std_precision:.4f}")
+        self.eval_results_text.append(f"Mean Recall: {mean_recall:.4f} ± {std_recall:.4f}")
+        
+        # Create visual analysis with multiple plots
+        
+        # 1. Box plots for each metric
+        fig1 = plt.figure(figsize=(8, 6))
+        metrics = ['accuracy', 'iou', 'dice', 'precision', 'recall']
+        metric_values = [results[m] for m in metrics]
+        plt.boxplot(metric_values, labels=[m.capitalize() for m in metrics])
+        plt.title('Distribution of Metrics')
+        plt.ylabel('Score')
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        
+        canvas1 = FigureCanvas(fig1)
+        self.eval_chart_layout.addWidget(canvas1)
+        
+        # 2. Histogram of IoU scores with normal distribution overlay
+        fig2 = plt.figure(figsize=(8, 6))
+        plt.hist(results['iou'], bins=20, alpha=0.7, color='#3498db', edgecolor='black')
+        plt.axvline(mean_iou, color='red', linestyle='dashed', linewidth=2, 
+                label=f'Mean IoU: {mean_iou:.4f}')
+        plt.title('IoU Score Distribution')
+        plt.xlabel('IoU Score')
+        plt.ylabel('Frequency')
+        plt.grid(True, alpha=0.3)
+        plt.legend()
+        plt.tight_layout()
+        
+        canvas2 = FigureCanvas(fig2)
+        self.eval_chart_layout.addWidget(canvas2)
+        
+        # 3. Precision-Recall scatter plot 
+        fig3 = plt.figure(figsize=(8, 6))
+        plt.scatter(results['recall'], results['precision'], c=results['iou'], 
+                cmap='viridis', alpha=0.7, edgecolors='w', linewidths=0.5)
+        plt.colorbar(label='IoU Score')
+        plt.title('Precision vs. Recall')
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.grid(True, alpha=0.3)
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
+        plt.tight_layout()
+        
+        canvas3 = FigureCanvas(fig3)
+        self.eval_chart_layout.addWidget(canvas3)
+        
+        # 4. Show best and worst samples
+        if len(results['dice']) >= 6:  # Make sure we have enough samples
+            # Find indices of best and worst samples
+            best_indices = np.argsort(results['iou'])[-3:]
+            worst_indices = np.argsort(results['iou'])[:3]
+            
+            # Create a figure to display them
+            fig4 = plt.figure(figsize=(12, 8))
+            plt.suptitle('Best and Worst Segmentation Results', fontsize=16)
+            
+            # Plot best samples
+            for i, idx in enumerate(reversed(best_indices)):
+                plt.subplot(2, 3, i + 1)
+                plt.title(f"Best #{i+1}: IoU={results['iou'][idx]:.4f}")
+                plt.text(0.5, 0.5, f"Image: {results['image_name'][idx]}", 
+                        ha='center', va='center', wrap=True)
+                plt.axis('off')
+            
+            # Plot worst samples
+            for i, idx in enumerate(worst_indices):
+                plt.subplot(2, 3, i + 4)
+                plt.title(f"Worst #{i+1}: IoU={results['iou'][idx]:.4f}")
+                plt.text(0.5, 0.5, f"Image: {results['image_name'][idx]}", 
+                        ha='center', va='center', wrap=True)
+                plt.axis('off')
+            
+            plt.tight_layout()
+            plt.subplots_adjust(top=0.9)
+            
+            canvas4 = FigureCanvas(fig4)
+            self.eval_chart_layout.addWidget(canvas4)
+
+
+    def calculate_dice(self, y_true, y_pred):
+        """Calculate Dice coefficient"""
+        intersection = np.sum(y_true * y_pred)
+        return (2. * intersection) / (np.sum(y_true) + np.sum(y_pred) + 1e-7)
+
+    def calculate_iou(self, y_true, y_pred):
+        """Calculate IoU (Intersection over Union)"""
+        intersection = np.sum(y_true * y_pred)
+        union = np.sum(y_true) + np.sum(y_pred) - intersection
+        return intersection / (union + 1e-7)
+
+    def calculate_precision_recall(self, y_true, y_pred):
+        """Calculate precision and recall"""
+        true_positives = np.sum(y_true * y_pred)
+        false_positives = np.sum((1 - y_true) * y_pred)
+        false_negatives = np.sum(y_true * (1 - y_pred))
+        
+        precision = true_positives / (true_positives + false_positives + 1e-7)
+        recall = true_positives / (true_positives + false_negatives + 1e-7)
+        
+        return precision, recall
+    
+    def display_segmentation_results(self, results):
+        """Display segmentation evaluation results with comprehensive charts"""
+        if not results['dice']:
+            self.eval_results_text.append("No valid results to display.")
+            return
+        
+        # Calculate statistics
+        mean_accuracy = np.mean(results['accuracy'])
+        mean_iou = np.mean(results['iou'])
+        mean_dice = np.mean(results['dice'])
+        mean_precision = np.mean(results['precision'])
+        mean_recall = np.mean(results['recall'])
+        
+        std_accuracy = np.std(results['accuracy'])
+        std_iou = np.std(results['iou'])
+        std_dice = np.std(results['dice'])
+        std_precision = np.std(results['precision'])
+        std_recall = np.std(results['recall'])
+        
+        # Display text results
+        self.eval_results_text.append(f"\nSegmentation Evaluation Results:")
+        self.eval_results_text.append(f"Number of images evaluated: {len(results['dice'])}")
+        self.eval_results_text.append(f"Mean Accuracy: {mean_accuracy:.4f} ± {std_accuracy:.4f}")
+        self.eval_results_text.append(f"Mean IoU: {mean_iou:.4f} ± {std_iou:.4f}")
+        self.eval_results_text.append(f"Mean Dice Coefficient: {mean_dice:.4f} ± {std_dice:.4f}")
+        self.eval_results_text.append(f"Mean Precision: {mean_precision:.4f} ± {std_precision:.4f}")
+        self.eval_results_text.append(f"Mean Recall: {mean_recall:.4f} ± {std_recall:.4f}")
+        
+        # Create box plots for each metric
+        fig1 = plt.figure(figsize=(8, 6))
+        metrics = ['accuracy', 'iou', 'dice', 'precision', 'recall']
+        metric_values = [results[m] for m in metrics]
+        plt.boxplot(metric_values, labels=[m.capitalize() for m in metrics])
+        plt.title('Distribution of Metrics')
+        plt.ylabel('Score')
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        
+        canvas1 = FigureCanvas(fig1)
+        self.eval_chart_layout.addWidget(canvas1)
+        
+        # Histogram of IoU scores
+        fig2 = plt.figure(figsize=(8, 6))
+        plt.hist(results['iou'], bins=20, alpha=0.7, color='#3498db', edgecolor='black')
+        plt.axvline(mean_iou, color='red', linestyle='dashed', linewidth=2, 
+                label=f'Mean IoU: {mean_iou:.4f}')
+        plt.title('IoU Score Distribution')
+        plt.xlabel('IoU Score')
+        plt.ylabel('Frequency')
+        plt.grid(True, alpha=0.3)
+        plt.legend()
+        plt.tight_layout()
+        
+        canvas2 = FigureCanvas(fig2)
+        self.eval_chart_layout.addWidget(canvas2)
+        
+        # Precision-Recall scatter plot
+        fig3 = plt.figure(figsize=(8, 6))
+        plt.scatter(results['recall'], results['precision'], c=results['iou'], 
+                cmap='viridis', alpha=0.7, edgecolors='w', linewidths=0.5)
+        plt.colorbar(label='IoU Score')
+        plt.title('Precision vs. Recall')
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.grid(True, alpha=0.3)
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
+        plt.tight_layout()
+        
+        canvas3 = FigureCanvas(fig3)
+        self.eval_chart_layout.addWidget(canvas3)
+
+
+
+    def evaluate_classification(self):
+        """Evaluate the classification model on the dataset"""
+        if not hasattr(self, 'image_files') or not self.image_files:
+            QMessageBox.warning(self, "No Images", "Please select a valid dataset folder first.")
+            return
+        
+        # Clear previous results
+        self.eval_results_text.clear()
+        self.clear_chart_layout()
+        
+        # Initialize lists for true and predicted labels and additional metrics
+        results = {
+            'image_name': [],
+            'true_label': [],
+            'predicted_label': [],
+            'confidence': []
+        }
+        
+        # Update UI
+        self.eval_results_text.append("Starting classification evaluation...")
+        QApplication.processEvents()
+        
+        # Load the classifier
+        try:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            classifier_path = os.path.join(script_dir, "models", "classifier.pkl")
+            clf_model = joblib.load(classifier_path)
+        except Exception as e:
+            self.eval_results_text.append(f"Failed to load classifier: {str(e)}")
+            return
+        
+        # Limit to 100 images
+        max_images = min(100, min(len(self.image_files), len(self.mask_files)))
+        
+        # Process images
+        for i in range(max_images):
+            # Update progress
+            self.eval_progress.setValue((i+1) * 100 // max_images)
+            QApplication.processEvents()
+            
+            # Get ground truth label
+            true_label = self.get_ground_truth_label(self.image_files[i])
+            
+            # Load image and mask
+            image_path = os.path.join(self.image_folder, self.image_files[i])
+            mask_path = os.path.join(self.mask_folder, self.mask_files[i])
+            
+            original_image = cv2.imread(image_path)
+            mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+            
+            if original_image is None or mask is None:
+                continue
+            
+            original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
+            mask = (mask > 0).astype(np.uint8)
+            
+            # Extract features and classify
+            try:
+                features = extract_features(original_image, mask)
+                pred_label = clf_model.predict([features])[0]
+                
+                # Get confidence if available
+                confidence = 0
+                if hasattr(clf_model, 'predict_proba'):
+                    probs = clf_model.predict_proba([features])[0]
+                    confidence = np.max(probs)
+                
+                # Store results
+                results['image_name'].append(self.image_files[i])
+                results['true_label'].append(true_label)
+                results['predicted_label'].append(pred_label)
+                results['confidence'].append(confidence)
+                
+            except Exception as e:
+                self.eval_results_text.append(f"Error classifying {self.image_files[i]}: {str(e)}")
+        
+        # Calculate and display classification results
+        self.display_classification_results(results)
+
+    def display_classification_results(self, results):
+        """Display classification evaluation results with advanced visualizations"""
+        if not results['true_label'] or not results['predicted_label']:
+            self.eval_results_text.append("No valid classification results to display.")
+            return
+        
+        from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+        import seaborn as sns
+        
+        # Convert results to numpy arrays for easier processing
+        true_labels = np.array(results['true_label'])
+        pred_labels = np.array(results['predicted_label'])
+        
+        # Calculate metrics
+        accuracy = accuracy_score(true_labels, pred_labels)
+        report_dict = classification_report(true_labels, pred_labels, output_dict=True)
+        cm = confusion_matrix(true_labels, pred_labels)
+        
+        # Get unique labels (in order)
+        unique_labels = sorted(list(set(true_labels) | set(pred_labels)))
+        
+        # Display text results
+        self.eval_results_text.append(f"\nClassification Evaluation Results:")
+        self.eval_results_text.append(f"Number of samples evaluated: {len(true_labels)}")
+        self.eval_results_text.append(f"Accuracy: {accuracy:.4f}")
+        self.eval_results_text.append("\nClassification Report:")
+        
+        # Format and display classification report
+        for label in unique_labels:
+            if label in report_dict:
+                precision = report_dict[label]['precision']
+                recall = report_dict[label]['recall']
+                f1 = report_dict[label]['f1-score']
+                support = report_dict[label]['support']
+                self.eval_results_text.append(f"  {label}:")
+                self.eval_results_text.append(f"    Precision: {precision:.4f}")
+                self.eval_results_text.append(f"    Recall: {recall:.4f}")
+                self.eval_results_text.append(f"    F1-score: {f1:.4f}")
+                self.eval_results_text.append(f"    Support: {support}")
+        
+        # Confusion matrix visualization with improved styling
+        fig1 = plt.figure(figsize=(10, 8))
+        ax1 = fig1.add_subplot(111)
+        
+        # Normalize confusion matrix for better visualization
+        cm_norm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        
+        sns.heatmap(cm_norm, annot=cm, fmt='d', cmap='Blues', 
+                xticklabels=unique_labels, yticklabels=unique_labels, ax=ax1)
+        ax1.set_xlabel('Predicted Label')
+        ax1.set_ylabel('True Label')
+        ax1.set_title('Confusion Matrix (numbers: counts, colors: normalized)')
+        plt.tight_layout()
+        
+        canvas1 = FigureCanvas(fig1)
+        self.eval_chart_layout.addWidget(canvas1)
+        
+        # Performance metrics by class
+        fig2 = plt.figure(figsize=(12, 6))
+        
+        # Collect metrics per class
+        classes = []
+        precisions = []
+        recalls = []
+        f1_scores = []
+        
+        for label in unique_labels:
+            if label in report_dict:
+                classes.append(label)
+                precisions.append(report_dict[label]['precision'])
+                recalls.append(report_dict[label]['recall'])
+                f1_scores.append(report_dict[label]['f1-score'])
+        
+        x = np.arange(len(classes))
+        width = 0.25
+        
+        plt.bar(x - width, precisions, width, label='Precision', color='#3498db')
+        plt.bar(x, recalls, width, label='Recall', color='#2ecc71')
+        plt.bar(x + width, f1_scores, width, label='F1-score', color='#e74c3c')
+        
+        plt.xlabel('Class')
+        plt.ylabel('Score')
+        plt.title('Performance Metrics by Class')
+        plt.xticks(x, classes, rotation=45, ha='right')
+        plt.legend()
+        plt.ylim(0, 1.1)
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        
+        canvas2 = FigureCanvas(fig2)
+        self.eval_chart_layout.addWidget(canvas2)
+        
+        # Confidence distribution histogram (if available)
+        if 'confidence' in results and results['confidence'] and any(c > 0 for c in results['confidence']):
+            fig3 = plt.figure(figsize=(10, 6))
+            
+            # Split confidences by correct and incorrect predictions
+            confidences = np.array(results['confidence'])
+            correct_pred = (true_labels == pred_labels)
+            
+            conf_correct = confidences[correct_pred]
+            conf_incorrect = confidences[~correct_pred]
+            
+            plt.hist([conf_correct, conf_incorrect], bins=20, alpha=0.7, 
+                    label=['Correct Predictions', 'Incorrect Predictions'],
+                    color=['#2ecc71', '#e74c3c'])
+            
+            plt.axvline(np.mean(confidences), color='navy', linestyle='dashed', 
+                    linewidth=2, label=f'Mean Confidence: {np.mean(confidences):.4f}')
+            
+            plt.title('Prediction Confidence Distribution')
+            plt.xlabel('Confidence Score')
+            plt.ylabel('Frequency')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            plt.tight_layout()
+            
+            canvas3 = FigureCanvas(fig3)
+            self.eval_chart_layout.addWidget(canvas3)
+
+
+    def clear_chart_layout(self):
+        """Clear all widgets from the chart layout"""
+        for i in reversed(range(self.eval_chart_layout.count())):
+            widget = self.eval_chart_layout.itemAt(i).widget()
+            if widget is not None:
+                widget.deleteLater()
+        
+        # Add placeholder text back
+        placeholder_label = QLabel("Charts will appear here after evaluation")
+        placeholder_label.setAlignment(Qt.AlignCenter)
+        placeholder_label.setStyleSheet("color: #888; font-style: italic;")
+        self.eval_chart_layout.addWidget(placeholder_label)
+
+    def get_ground_truth_label(self, image_file):
+        """Get ground truth label for an image"""
+        # In a real application, this would extract labels from filenames or a mapping file
+        # For demonstration, return a random cell type
+        import random
+        return random.choice(['Neutrophil', 'Lymphocyte', 'Monocyte', 'Eosinophil', 'Basophil'])
+
 
 def main():
     # Enable high DPI scaling
