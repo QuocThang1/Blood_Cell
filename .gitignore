@@ -4,3 +4,5 @@ assets/
 *pth
 *.idea
 __pycache__/
+*pkl
+*h5
