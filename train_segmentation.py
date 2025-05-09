@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 from unet import UNet
 from dataset import BloodCellDataset
-from utils import get_transforms
+from utility import get_transforms
 from config import image_dir, mask_dir, batch_size, num_epochs, learning_rate
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"

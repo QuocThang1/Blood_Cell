@@ -19,6 +19,7 @@ import os
 import joblib # Add this import
 import torch
 from torchvision import transforms
+from utils.features import extract_features
 
 from unet import UNet  # Ensure the file is named unet.py
 
@@ -540,7 +541,7 @@ class MedicalImageSegmentationApp(QMainWindow):
         QApplication.processEvents()
 
         try:
-            from utils.features import extract_features # Consider moving this import to the top of the file
+             # Consider moving this import to the top of the file
             features = extract_features(self.original_image, self.segmented_mask)
         except ImportError:
             self.results_label.setText("Failed to import 'extract_features' from utils!")
