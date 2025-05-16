@@ -3,8 +3,8 @@ import cv2
 import numpy as np
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QPushButton, QVBoxLayout, 
                             QHBoxLayout, QWidget, QFileDialog, QComboBox, QSlider, QGroupBox,
-                            QStatusBar, QSplitter, QProgressBar, QFrame, QToolButton)
-from PyQt5.QtGui import QPixmap, QImage, QFont, QIcon, QPalette, QColor, QLinearGradient, QBrush
+                            QStatusBar, QSplitter, QProgressBar, QFrame, QToolButton, QGridLayout)
+from PyQt5.QtGui import QPixmap, QImage, QFont, QIcon, QPalette, QColor, QLinearGradient, QBrush, QPainter 
 from PyQt5.QtCore import Qt, QSize, QTimer
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -16,12 +16,11 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 import pickle
 import os
-import joblib # Add this import
+import joblib
 import torch
 from torchvision import transforms
 from utils.features import extract_features
-
-from unet import UNet  # Ensure the file is named unet.py
+from unet import UNet
 
 class MedicalImageSegmentationApp(QMainWindow):
     def __init__(self):
@@ -30,55 +29,71 @@ class MedicalImageSegmentationApp(QMainWindow):
         # Set application style and colors
         self.setStyleSheet("""
             QMainWindow {
-                background-color: #f0f4f8;
+                background-color: #f7f9fc;
             }
             QGroupBox {
                 font-weight: bold;
                 font-size: 12px;
-                border: 2px solid #6c8ebf;
+                border: 1px solid #c0d3e8;
                 border-radius: 8px;
                 margin-top: 1ex;
-                background-color: #e9eff8;
+                background-color: rgba(233, 241, 251, 0.8);
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
                 subcontrol-position: top center;
-                padding: 0 5px;
+                padding: 0 8px;
                 color: #2c3e50;
-                background-color: #d4e2f4;
-                border-radius: 3px;
+                background-color: #e1ebf7;
+                border-radius: 1px;
             }
             QPushButton {
-                background-color: #3498db;
+                background-color: #2081e2;
                 color: white;
                 border-radius: 5px;
-                padding: 6px;
+                padding: 8px;
                 font-weight: bold;
+                min-height: 30px;
+                border: none;
             }
             QPushButton:hover {
-                background-color: #2980b9;
+                background-color: #1669c4;
             }
             QPushButton:pressed {
-                background-color: #1c6ea4;
+                background-color: #0d4e96;
+            }
+            QPushButton:disabled {
+                background-color: #a0b5cc;
+                color: #e5e5e5;
             }
             QLabel {
                 color: #2c3e50;
             }
             QSlider::groove:horizontal {
-                border: 1px solid #bbb;
+                border: 1px solid #c0d3e8;
                 background: white;
-                height: 10px;
+                height: 8px;
                 border-radius: 4px;
             }
             QSlider::handle:horizontal {
-                background: #3498db;
-                border: 1px solid #5c5c5c;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #2081e2, stop:1 #1669c4);
+                border: none;
                 width: 18px;
                 margin: -2px 0;
-                border-radius: 3px;
+                border-radius: 9px;
+            }
+            QProgressBar {
+                border: 1px solid #c0d3e8;
+                border-radius: 5px;
+                text-align: center;
+                background-color: #f0f4f8;
+            }
+            QProgressBar::chunk {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2081e2, stop:1 #49aeff);
+                border-radius: 5px;
             }
         """)
-        
+
         self.initUI()
         
         # Initialize variables
@@ -95,11 +110,11 @@ class MedicalImageSegmentationApp(QMainWindow):
         
         # Load PyTorch model
         try:
-            self.segmentation_model = UNet(n_channels=3, n_classes=1)  # Specify the number of input channels and output classes
+            self.segmentation_model = UNet(n_channels=3, n_classes=1)
             self.segmentation_model.load_state_dict(
                 torch.load("models/unet_best-8-5-16-26.pth", map_location=torch.device('cpu'))
             )
-            self.segmentation_model.eval()  # Switch to evaluation mode
+            self.segmentation_model.eval()
             print("PyTorch model loaded successfully!")
         except Exception as e:
             print(f"Error loading PyTorch model: {e}")
@@ -110,10 +125,6 @@ class MedicalImageSegmentationApp(QMainWindow):
         In real application, load a pre-trained classifier for white cell classification
         Here we mock up a simple classifier
         """
-        # This is a placeholder - in a real application, you would load a trained model
-        # For example: return pickle.load(open('white_cell_classifier.pkl', 'rb'))
-        
-        # Mock classifier - in real app, this would be replaced with a trained model
         class MockClassifier:
             def predict(self, features):
                 # For demo purposes, return a random class
@@ -125,222 +136,329 @@ class MedicalImageSegmentationApp(QMainWindow):
     def initUI(self):
         # Set window properties
         self.setWindowTitle("Medical Image Segmentation and Classification")
-        self.setGeometry(100, 100, 1200, 800)
-        
-        # Set application icon if you have one
-        # self.setWindowIcon(QIcon('icon.png'))
+        self.setGeometry(100, 100, 1500, 950)
         
         # Set application font
         font = QFont("Segoe UI", 10)
         QApplication.setFont(font)
         
-        # Create main splitter
-        main_splitter = QSplitter(Qt.Horizontal)
+        # Main container widget
+        main_container = QWidget()
+        main_layout = QVBoxLayout(main_container)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         
-        # Create left panel container with styled border
-        left_container = QFrame()
-        left_container.setFrameShape(QFrame.StyledPanel)
-        left_container.setAutoFillBackground(True)
-        palette = left_container.palette()
-        palette.setColor(QPalette.Window, QColor("#e6eef5"))
-        left_container.setPalette(palette)
+        # Top header with fixed height - important fix
+        top_header = QFrame()
+        top_header.setStyleSheet("""
+            QFrame {
+                background-color: #e6eef5;
+                border-bottom: 2px solid #c0d3e8;
+            }
+        """)
+        # Set fixed height instead of percentage
+        top_header.setFixedHeight(300)
         
-        # Left panel - controls
-        left_panel = QVBoxLayout(left_container)
-        left_panel.setContentsMargins(10, 10, 10, 10)
-        left_panel.setSpacing(15)
+        # Top header layout
+        top_header_layout = QVBoxLayout(top_header)
+        top_header_layout.setContentsMargins(15, 10, 15, 10)
         
-        # App title and logo
-        title_layout = QHBoxLayout()
-        app_logo = QLabel()
-        app_logo.setPixmap(self.create_icon_pixmap("microscope", QSize(40, 40)))
-        title_layout.addWidget(app_logo)
+        # Create the app title banner with fixed height
+        header_frame = QFrame()
+        header_frame.setFixedHeight(100)  # Fixed height for the banner
+        header_frame.setStyleSheet("""
+            QFrame {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                                            stop:0 #1a5276, stop:1 #2081e2); 
+                border-radius: 8px;
+                margin-bottom: 10px;
+            }
+        """)
         
-        app_title = QLabel("Medical Image Analysis")
-        app_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #2c3e50;")
-        title_layout.addWidget(app_title, 1)
-        left_panel.addLayout(title_layout)
+        header_layout = QHBoxLayout(header_frame)
+        header_layout.setContentsMargins(15, 5, 15, 5)
+        header_layout.setStretch(0, 2)  
+        header_layout.setStretch(1, 1)  
+        header_layout.setStretch(2, 3)
         
-        # Horizontal line
-        h_line = QFrame()
-        h_line.setFrameShape(QFrame.HLine)
-        h_line.setFrameShadow(QFrame.Sunken)
-        h_line.setStyleSheet("background-color: #6c8ebf;")
-        left_panel.addWidget(h_line)
+        # App title and subtitle
+        title_layout = QVBoxLayout()
+        app_title = QLabel("Blood Cell Analyzer")
+        app_title.setStyleSheet("""
+            font-size: 28px; 
+            font-weight: bold; 
+            color: white;
+            background: transparent;
+            text-align: center;
+        """)
+        app_subtitle = QLabel("Medical Image Segmentation & Classification")
+        app_subtitle.setStyleSheet("""
+            font-size: 12px; 
+            color: #e6eef5;
+            background: transparent;
+            text-align: center;
+        """)
+        title_layout.addWidget(app_title)
+        title_layout.addWidget(app_subtitle)
+        header_layout.addLayout(title_layout)
+        header_layout.addStretch()
         
-        # File operations
+        # Add team information to the right of header
+        team_layout = QVBoxLayout()
+        team_layout.setContentsMargins(0, 0, 10, 0)
+        team_name = QLabel("Group 5")
+        team_name.setStyleSheet("""
+            font-size: 16px; 
+            font-weight: bold; 
+            color: white; 
+            background: transparent;
+        """)
+        team_name.setAlignment(Qt.AlignRight)
+        team_layout.addWidget(team_name)
+        
+        # Add team members
+        # Create a grid layout for team members (2 columns)
+        members_grid = QGridLayout()
+        members_grid.setSpacing(5)  # Spacing between cells
+        members_grid.setContentsMargins(0, 0, 0, 0)  # Minimize margins
+
+        # Member information
+        members = [
+            "22110007 - Nguyễn Nhật An",
+            "22110028 - Nguyễn Mai Huy Hoàng",
+            "22110070 - Đinh Tô Quốc Thắng",
+            "22110076 - Trần Trung Tín"
+        ]
+
+        # Common style for all member labels
+        member_style = """
+            font-size: 12px;
+            font-weight: 500; 
+            color: #e6eef5; 
+            background: transparent;
+            padding: 0px;
+            margin: 0px;
+            border: none;
+        """
+
+        # Add members to the grid - 2 columns
+        for i, member in enumerate(members):
+            row = i // 2  # Integer division to determine row
+            col = i % 2   # Modulo to determine column (0 or 1)
+            
+            member_label = QLabel(member)
+            member_label.setStyleSheet(member_style)
+            member_label.setAlignment(Qt.AlignLeft)
+            
+            members_grid.addWidget(member_label, row, col)
+
+        # Add the grid to the team layout
+        team_layout.addLayout(members_grid)
+        header_layout.addLayout(team_layout)
+        top_header_layout.addWidget(header_frame)
+        
+        # Create horizontal layout for controls (previously in left sidebar)
+        controls_layout = QHBoxLayout()
+        controls_layout.setSpacing(15)
+        
+        # File operations group with fixed height
         file_group = QGroupBox("File Operations")
-        file_layout = QVBoxLayout()
+        file_group.setFixedHeight(150)  # Fixed height
+        file_layout = QHBoxLayout()
+        file_layout.setContentsMargins(10, 15, 10, 10)
+        file_layout.setSpacing(10)
         
-        # Load image button with icon
-        self.load_button = QPushButton("  Load Image")
-        self.load_button.setIcon(self.create_icon("folder-open"))
-        self.load_button.setIconSize(QSize(20, 20))
+        # Load image button
+        self.load_button = QPushButton("Load Image")
+        self.load_button.setMinimumHeight(40)
         self.load_button.clicked.connect(self.load_image)
         file_layout.addWidget(self.load_button)
         
-        # Save results button with icon
-        self.save_button = QPushButton("  Save Results")
-        self.save_button.setIcon(self.create_icon("save"))
-        self.save_button.setIconSize(QSize(20, 20))
+        # Save results button
+        self.save_button = QPushButton("Save Results")
         self.save_button.clicked.connect(self.save_results)
         file_layout.addWidget(self.save_button)
         
         file_group.setLayout(file_layout)
-        left_panel.addWidget(file_group)
+        controls_layout.addWidget(file_group)
         
-        # Processing operations
+        # Processing operations group with fixed height
         processing_group = QGroupBox("Image Processing")
-        processing_layout = QVBoxLayout()
+        processing_group.setFixedHeight(150)  # Fixed height
+        processing_layout = QHBoxLayout()
+        processing_layout.setContentsMargins(10, 15, 10, 10)
+        processing_layout.setSpacing(10)
         
-        # Segment button with icon
-        self.segment_button = QPushButton("  Perform Segmentation")
-        self.segment_button.setIcon(self.create_icon("split"))
-        self.segment_button.setIconSize(QSize(20, 20))
+        # Segment button
+        self.segment_button = QPushButton("Perform Segmentation")
         self.segment_button.clicked.connect(self.segment_image)
         processing_layout.addWidget(self.segment_button)
         
-        # Progress bar for segmentation
-        self.process_progress = QProgressBar()
-        self.process_progress.setRange(0, 100)
-        self.process_progress.setValue(0)
-        self.process_progress.setTextVisible(True)
-        self.process_progress.setStyleSheet("""
-            QProgressBar {
-                border: 1px solid #bbb;
-                border-radius: 5px;
-                text-align: center;
-                background-color: #f0f0f0;
-            }
-            QProgressBar::chunk {
-                background-color: #3498db;
-                border-radius: 5px;
-            }
-        """)
-        processing_layout.addWidget(self.process_progress)
-        
-        # Classify button with icon
-        self.classify_button = QPushButton("  Classify White Cell")
-        self.classify_button.setIcon(self.create_icon("tag"))
-        self.classify_button.setIconSize(QSize(20, 20))
+        # Classify button
+        self.classify_button = QPushButton("Classify White Cell")
         self.classify_button.clicked.connect(self.classify_white_cell)
         processing_layout.addWidget(self.classify_button)
         
         processing_group.setLayout(processing_layout)
-        left_panel.addWidget(processing_group)
+        controls_layout.addWidget(processing_group)
         
-        # Results display with styled box
+        # Results display group with fixed height
         results_group = QGroupBox("Classification Results")
+        results_group.setFixedHeight(150)  # Fixed height is important
         results_layout = QVBoxLayout()
+        results_layout.setContentsMargins(10, 15, 10, 10)
+        
+        # Results label in a card with fixed height content
+        result_card = QFrame()
+        result_card.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border-radius: 8px;
+                border: 1px solid #d4e2f4;
+            }
+        """)
+        result_card_layout = QVBoxLayout(result_card)
+        result_card_layout.setContentsMargins(15, 5, 15, 5)
         
         self.results_label = QLabel("No classification results yet.")
         self.results_label.setWordWrap(True)
         self.results_label.setStyleSheet("""
-            background-color: white;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
+            padding: 5px;
             font-weight: bold;
+            color: #2c3e50;
+            background: transparent;
         """)
-        self.results_label.setMinimumHeight(60)
-        results_layout.addWidget(self.results_label)
+        self.results_label.setFixedHeight(110)
+        self.results_label.setAlignment(Qt.AlignCenter)
+        result_card_layout.addWidget(self.results_label)
         
+        results_layout.addWidget(result_card)
         results_group.setLayout(results_layout)
-        left_panel.addWidget(results_group)
+        controls_layout.addWidget(results_group)
         
-        left_panel.addStretch()
-
-        # Group Information
-        group_info_group = QGroupBox("Group Information")
-        group_info_layout = QVBoxLayout()
-
-        group_members = [
-            "Group 5",
-            "22110007 Nguyễn Nhật An",
-            "22110028 Nguyễn Mai Huy Hoàng", 
-            "22110070 Đinh Tô Quốc Thắng",
-            "22110076 Trần Trung Tín"
-        ]
-
-        for member in group_members:
-            member_label = QLabel(member)
-            # member_label.setStyleSheet("font-size: 10px; color: #2c3e50;") # Optional: style as needed
-            group_info_layout.addWidget(member_label)
-
-        group_info_group.setLayout(group_info_layout)
-        left_panel.addWidget(group_info_group)
+        top_header_layout.addLayout(controls_layout)
         
-        # Right panel - create container for image display
-        right_container = QWidget()
-        right_panel = QVBoxLayout(right_container)
-        right_panel.setContentsMargins(10, 10, 10, 10)
-        right_panel.setSpacing(15)
+        # Add top header to main layout
+        main_layout.addWidget(top_header)
         
-        # Add title to right panel
-        image_title = QLabel("Image Visualization")
-        image_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50;")
-        image_title.setAlignment(Qt.AlignCenter)
-        right_panel.addWidget(image_title)
+        # Main window content area
+        main_content = QWidget()
+        main_content.setStyleSheet("""
+            background-color: #f7f9fc;
+        """)
         
-        # Right panel layout for images (3x1 grid)
-        images_splitter = QSplitter(Qt.Vertical)
-        images_splitter.setChildrenCollapsible(False)
+        # Create the main content layout for images (horizontal)
+        main_content_layout = QHBoxLayout(main_content)
+        main_content_layout.setContentsMargins(15, 15, 15, 15)
+        main_content_layout.setSpacing(15)
         
         # Original image
-        original_group = QGroupBox("Original Image")
+        original_card = QGroupBox("Original Image")
+        original_card.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                font-size: 13px;
+                border: 1px solid #c0d3e8;
+                border-radius: 8px;
+                margin-top: 1ex;
+                background-color: white;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top center;
+                padding: 0 8px;
+                color: #2c3e50;
+                background-color: white;
+                border-radius: 4px;
+            }
+        """)
+        
         original_layout = QVBoxLayout()
+        original_layout.setContentsMargins(10, 15, 10, 10)
+        
+        # Image frame with shadow
+        image_frame = QFrame()
+        image_frame.setStyleSheet("""
+            QFrame {
+                background-color: #f8f9fa;
+                border: 1px solid #e1ebf7;
+                border-radius: 5px;
+            }
+        """)
+        image_layout = QVBoxLayout(image_frame)
+        image_layout.setContentsMargins(5, 5, 5, 5)
+        
         self.original_image_label = QLabel()
         self.original_image_label.setAlignment(Qt.AlignCenter)
-        self.original_image_label.setMinimumSize(400, 200)
-        self.original_image_label.setStyleSheet("""
-            background-color: #f8f9fa;
-            border: 2px solid #d4e2f4;
-            border-radius: 5px;
-        """)
-        original_layout.addWidget(self.original_image_label)
-        original_group.setLayout(original_layout)
-        images_splitter.addWidget(original_group)
+        self.original_image_label.setFixedSize(500, 500)
+        self.original_image_label.setStyleSheet("background: transparent;")
+        image_layout.addWidget(self.original_image_label)
+        
+        original_layout.addWidget(image_frame)
+        original_card.setLayout(original_layout)
+        main_content_layout.addWidget(original_card)
         
         # Segmentation mask
         mask_group = QGroupBox("Segmentation Mask")
         mask_layout = QVBoxLayout()
+        mask_layout.setContentsMargins(10, 15, 10, 10)
+        
+        mask_frame = QFrame()
+        mask_frame.setStyleSheet("""
+            QFrame {
+                background-color: #f8f9fa;
+                border: 1px solid #e1ebf7;
+                border-radius: 5px;
+            }
+        """)
+        mask_frame_layout = QVBoxLayout(mask_frame)
+        mask_frame_layout.setContentsMargins(5, 5, 5, 5)
+        
         self.mask_image_label = QLabel()
         self.mask_image_label.setAlignment(Qt.AlignCenter)
-        self.mask_image_label.setMinimumSize(400, 200)
-        self.mask_image_label.setStyleSheet("""
-            background-color: #f8f9fa;
-            border: 2px solid #d4e2f4;
-            border-radius: 5px;
-        """)
-        mask_layout.addWidget(self.mask_image_label)
+        self.mask_image_label.setFixedSize(500, 500)
+        self.mask_image_label.setStyleSheet("background: transparent;")
+        mask_frame_layout.addWidget(self.mask_image_label)
+        
+        mask_layout.addWidget(mask_frame)
         mask_group.setLayout(mask_layout)
-        images_splitter.addWidget(mask_group)
+        main_content_layout.addWidget(mask_group)
         
         # Segmented image
         segmented_group = QGroupBox("Overlay Segmented Image")
         segmented_layout = QVBoxLayout()
+        segmented_layout.setContentsMargins(10, 15, 10, 10)
+        
+        segmented_frame = QFrame()
+        segmented_frame.setStyleSheet("""
+            QFrame {
+                background-color: #f8f9fa;
+                border: 1px solid #e1ebf7;
+                border-radius: 5px;
+            }
+        """)
+        segmented_frame_layout = QVBoxLayout(segmented_frame)
+        segmented_frame_layout.setContentsMargins(5, 5, 5, 5)
+        
         self.segmented_image_label = QLabel()
         self.segmented_image_label.setAlignment(Qt.AlignCenter)
-        self.segmented_image_label.setMinimumSize(400, 200)
-        self.segmented_image_label.setStyleSheet("""
-            background-color: #f8f9fa;
-            border: 2px solid #d4e2f4;
-            border-radius: 5px;
-        """)
-        segmented_layout.addWidget(self.segmented_image_label)
+        self.segmented_image_label.setFixedSize(500, 500)
+        self.segmented_image_label.setStyleSheet("background: transparent;")
+        segmented_frame_layout.addWidget(self.segmented_image_label)
+        
+        segmented_layout.addWidget(segmented_frame)
         segmented_group.setLayout(segmented_layout)
-        images_splitter.addWidget(segmented_group)
+        main_content_layout.addWidget(segmented_group)
         
-        right_panel.addWidget(images_splitter)
+        # Add main content to main layout
+        main_layout.addWidget(main_content)
         
-        # Add panels to main splitter
-        main_splitter.addWidget(left_container)
-        main_splitter.addWidget(right_container)
-        main_splitter.setStretchFactor(0, 1)  # Left panel
-        main_splitter.setStretchFactor(1, 3)  # Right panel
+        # Set the proportion between top header and main content
+        main_layout.setStretch(0, 0)  # Top header (fixed height, no stretch)
+        main_layout.setStretch(1, 1)  # Main content (takes remaining space)
         
         # Set central widget
-        self.setCentralWidget(main_splitter)
+        self.setCentralWidget(main_container)
     
     def create_icon(self, name):
         """Create an icon based on name (placeholder for actual icons)"""
@@ -362,22 +480,74 @@ class MedicalImageSegmentationApp(QMainWindow):
         return QIcon(pixmap)
         
     def create_icon_pixmap(self, name, size):
-        """Create a pixmap icon based on name (placeholder for actual icons)"""
+        """Create a professional-looking icon"""
+        
+        # Tạo gradient pixmap cho logo app
+        if name == "microscope":
+            pixmap = QPixmap(size)
+            pixmap.fill(Qt.transparent)
+            
+            painter = QPainter(pixmap)
+            painter.setRenderHint(QPainter.Antialiasing)
+            
+            # Tạo gradient
+            gradient = QLinearGradient(0, 0, size.width(), size.height())
+            gradient.setColorAt(0, QColor(32, 129, 226))    # Blue
+            gradient.setColorAt(1, QColor(20, 170, 192))    # Teal
+            
+            # Vẽ biểu tượng kính hiển vi đơn giản
+            painter.setBrush(QBrush(gradient))
+            painter.setPen(Qt.NoPen)
+            
+            # Vẽ phần thân kính hiển vi - chuyển đổi tất cả giá trị float thành int
+            painter.drawRoundedRect(int(size.width()*0.25), int(size.height()*0.4), 
+                                int(size.width()*0.5), int(size.height()*0.5), 5, 5)
+            
+            # Vẽ phần ống kính - chuyển đổi tất cả giá trị float thành int
+            painter.drawEllipse(int(size.width()*0.3), int(size.height()*0.15), 
+                            int(size.width()*0.4), int(size.width()*0.4))
+            
+            # Vẽ phần chân đế - chuyển đổi tất cả giá trị float thành int
+            painter.drawRoundedRect(int(size.width()*0.15), int(size.height()*0.85), 
+                                int(size.width()*0.7), int(size.height()*0.1), 3, 3)
+            
+            painter.end()
+            return pixmap
+        
+        # Tạo gradient icons cho các nút
         color_map = {
-            "folder-open": QColor(255, 193, 7),
-            "save": QColor(0, 150, 136),
-            "split": QColor(156, 39, 176),
-            "tag": QColor(33, 150, 243),
-            "chart-bar": QColor(233, 30, 99),
-            "contrast": QColor(63, 81, 181),
-            "sharpen": QColor(76, 175, 80),
-            "microscope": QColor(96, 125, 139)
+            "folder-open": [QColor(52, 152, 219), QColor(41, 128, 185)],
+            "save": [QColor(46, 204, 113), QColor(39, 174, 96)],
+            "split": [QColor(155, 89, 182), QColor(142, 68, 173)],
+            "tag": [QColor(52, 152, 219), QColor(41, 128, 185)],
+            "chart-bar": [QColor(231, 76, 60), QColor(192, 57, 43)],
+            "contrast": [QColor(52, 73, 94), QColor(44, 62, 80)],
+            "sharpen": [QColor(46, 204, 113), QColor(39, 174, 96)]
         }
         
         pixmap = QPixmap(size)
-        pixmap.fill(color_map.get(name, QColor(120, 120, 120)))
-        return pixmap
+        pixmap.fill(Qt.transparent)
         
+        if name in color_map:
+            painter = QPainter(pixmap)
+            painter.setRenderHint(QPainter.Antialiasing)
+            
+            # Tạo gradient
+            gradient = QLinearGradient(0, 0, 0, size.height())
+            gradient.setColorAt(0, color_map[name][0])
+            gradient.setColorAt(1, color_map[name][1])
+            
+            # Vẽ biểu tượng với gradient
+            painter.setBrush(QBrush(gradient))
+            painter.setPen(Qt.NoPen)
+            painter.drawRoundedRect(0, 0, size.width(), size.height(), 8, 8)
+            painter.end()
+        else:
+            pixmap.fill(QColor(120, 120, 120))
+            
+        return pixmap
+
+    
     def load_image(self):
         """Load an image from the file system"""
         file_path, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp)")
@@ -406,8 +576,6 @@ class MedicalImageSegmentationApp(QMainWindow):
             
             # Update status bar
             self.statusBar.showMessage(f"Image loaded: {file_path.split('/')[-1]} ({self.original_image.shape[1]}x{self.original_image.shape[0]})", 5000)
-            
-            # Reset sliders to default
     
     def segment_image(self):
         """Perform image segmentation using the PyTorch model."""
@@ -423,7 +591,6 @@ class MedicalImageSegmentationApp(QMainWindow):
 
         # Show progress and status
         self.statusBar.showMessage("Segmenting image...")
-        self.process_progress.setValue(10)
         QApplication.processEvents()
 
         # Preprocess the image
@@ -465,7 +632,6 @@ class MedicalImageSegmentationApp(QMainWindow):
         # Update status and results
         self.results_label.setText("Segmentation completed. Ready for classification.")
         self.statusBar.showMessage("Segmentation completed", 5000)
-        self.process_progress.setValue(100)
     
     def classify_white_cell(self):
         """Classify the type of white blood cell using the pre-trained classifier."""
@@ -476,11 +642,10 @@ class MedicalImageSegmentationApp(QMainWindow):
 
         # Extract features from the segmented region
         self.statusBar.showMessage("Extracting features...")
-        self.process_progress.setValue(30)
         QApplication.processEvents()
 
         try:
-             # Consider moving this import to the top of the file
+            # Consider moving this import to the top of the file
             features = extract_features(self.original_image, self.segmented_mask)
         except ImportError:
             self.results_label.setText("Failed to import 'extract_features' from utils!")
@@ -511,7 +676,6 @@ class MedicalImageSegmentationApp(QMainWindow):
 
         # Predict the cell type
         self.statusBar.showMessage("Classifying white blood cell...")
-        self.process_progress.setValue(60)
         QApplication.processEvents()
 
         try:
@@ -523,18 +687,17 @@ class MedicalImageSegmentationApp(QMainWindow):
             self.statusBar.showMessage(f"Error: {e}", 3000)
             return
 
-        # Display the result
+        # Display the result - shortened to fit fixed height
         result_html = f"""
         <div style='text-align:center;'>
-            <h3 style='color:#2980b9;'>Classification Result:</h3>
-            <p style='font-size:16px; font-weight:bold; color:#16a085;'>{pred_label} White Blood Cell</p>
-            <p style='font-size:14px; color:#2c3e50;'>Accuracy: {accuracy:.2f}%</p>
+            <p style='font-size:14px; font-weight:bold; color:#2980b9;'>Classification Result:</p>
+            <p style='font-size:14px; font-weight:bold; color:#16a085;'>{pred_label} White Blood Cell</p>
+            <p style='font-size:12px; color:#2c3e50;'>Accuracy: {accuracy:.2f}%</p>
         </div>
         """
         self.results_label.setText(result_html)
         self.results_label.setTextFormat(Qt.RichText)
         self.statusBar.showMessage(f"Classification complete: {pred_label}", 5000)
-        self.process_progress.setValue(100)
     
     def adjust_contrast(self):
         """Adjust image contrast"""
@@ -732,12 +895,10 @@ class MedicalImageSegmentationApp(QMainWindow):
         if file_path:
             # Show saving status
             self.statusBar.showMessage("Saving results...")
-            self.process_progress.setValue(30)
             QApplication.processEvents()
             
             # Save segmented image
             cv2.imwrite(file_path, cv2.cvtColor(self.segmented_image, cv2.COLOR_RGB2BGR))
-            self.process_progress.setValue(60)
             QApplication.processEvents()
             
             # Save text results
@@ -751,17 +912,13 @@ class MedicalImageSegmentationApp(QMainWindow):
             
             # Save mask image
             mask_file = os.path.splitext(file_path)[0] + "_mask.png"
-            cv2.imwrite(mask_file, cv2.cvtColor(self.segmented_mask, cv2.COLOR_RGB2BGR))
+            cv2.imwrite(mask_file, self.segmented_mask * 255)
             
-            self.process_progress.setValue(100)
             QApplication.processEvents()
             
             success_msg = f"Results saved to {file_path}"
             self.results_label.setText(success_msg)
             self.statusBar.showMessage(success_msg, 5000)
-            
-            # Reset progress bar after a delay
-            QTimer.singleShot(2000, lambda: self.process_progress.setValue(0))
     
     def display_image(self, image, label):
         """Display an image on a QLabel with enhanced visual style"""
