@@ -52,7 +52,7 @@ This project implements advanced image processing and pattern recognition techni
 3. Download model files:
 
    - Download the pre-trained model files from [Google Drive](https://drive.google.com/drive/folders/1ZiXHUu2obyGsv7l_4m9StOseHzgjkh4z?usp=sharing)
-   - **unet_best-9-5-23-00.pth**: Segmentation model
+   - **unet_best-8-5-16-26.pth**: Segmentation model
    - **classifier.pkl**: Cell classification model
 
 4. Create a models folder and place the downloaded files inside:
