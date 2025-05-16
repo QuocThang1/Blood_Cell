@@ -206,7 +206,7 @@ class MedicalImageSegmentationApp(QMainWindow):
         # Add team information to the right of header
         team_layout = QVBoxLayout()
         team_layout.setContentsMargins(0, 0, 10, 0)
-        team_name = QLabel("Group 5")
+        team_name = QLabel("Group 4")
         team_name.setStyleSheet("""
             font-size: 16px; 
             font-weight: bold; 
